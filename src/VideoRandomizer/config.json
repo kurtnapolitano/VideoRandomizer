@@ -1,0 +1,31 @@
+{
+  // ---------------------------------------------------------------------------
+  //  VideoRandomizer configuration
+  //
+  //  Paths: use forward slashes  ->  "C:/Videos"
+  //         or doubled backslashes -> "C:\\Videos"
+  //         Network shares work too -> "//server/share/Videos"
+  // ---------------------------------------------------------------------------
+
+  // Folder containing the videos to play.
+  "videoFolder": "C:/Videos",
+
+  // Which files in that folder count as videos.
+  "videoExtensions": [ ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".m4v", ".webm", ".mpg", ".mpeg" ],
+
+  // Folder containing the bumper images shown between videos.
+  // Leave this blank ("") to turn bumpers off entirely.
+  "bumperFolder": "C:/Bumpers",
+
+  // Which files in that folder count as bumper images.
+  "bumperExtensions": [ ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp" ],
+
+  // How long each bumper image stays on screen, in milliseconds. 5000 = 5 seconds.
+  "bumperDurationMs": 5000,
+
+  // Also scan subfolders of the two folders above.
+  "searchSubfolders": false,
+
+  // Play videos with the sound muted.
+  "muteAudio": false
+}
