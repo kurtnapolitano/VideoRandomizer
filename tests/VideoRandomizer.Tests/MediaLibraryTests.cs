@@ -50,6 +50,54 @@ public class MediaLibraryTests
     }
 
     [Fact]
+    public void ScanBumpers_TagsImagesAndVideosSeparately()
+    {
+        using var dir = new TempDir();
+        dir.Touch("still.png");
+        dir.Touch("clip.mp4");
+        dir.Touch("notes.txt");
+
+        var bumpers = MediaLibrary.ScanBumpers(dir.Path, [".png"], [".mp4"], searchSubfolders: false);
+
+        Assert.Equal(2, bumpers.Count);
+        Assert.Contains(bumpers, b => b.Kind == BumperKind.Image && b.Path.EndsWith("still.png"));
+        Assert.Contains(bumpers, b => b.Kind == BumperKind.Video && b.Path.EndsWith("clip.mp4"));
+    }
+
+    [Fact]
+    public void ScanBumpers_ImagesOnlyWhenNoVideoExtensions()
+    {
+        using var dir = new TempDir();
+        dir.Touch("still.png");
+        dir.Touch("clip.mp4");
+
+        var bumpers = MediaLibrary.ScanBumpers(dir.Path, [".png"], [], searchSubfolders: false);
+
+        Assert.Equal(BumperKind.Image, Assert.Single(bumpers).Kind);
+    }
+
+    [Fact]
+    public void ScanBumpers_VideosOnlyWhenNoImageExtensions()
+    {
+        // This is the "bumperDurationMs: 0" case: stills are dropped, clips still play.
+        using var dir = new TempDir();
+        dir.Touch("still.png");
+        dir.Touch("clip.mp4");
+
+        var bumpers = MediaLibrary.ScanBumpers(dir.Path, [], [".mp4"], searchSubfolders: false);
+
+        Assert.Equal(BumperKind.Video, Assert.Single(bumpers).Kind);
+    }
+
+    [Fact]
+    public void ScanBumpers_EmptyFolderYieldsNoBumpers()
+    {
+        using var dir = new TempDir();
+
+        Assert.Empty(MediaLibrary.ScanBumpers(dir.Path, [".png"], [".mp4"], searchSubfolders: false));
+    }
+
+    [Fact]
     public void Shuffle_KeepsEveryItem()
     {
         var items = Enumerable.Range(0, 200).Select(i => $"v{i}.mp4").ToList();

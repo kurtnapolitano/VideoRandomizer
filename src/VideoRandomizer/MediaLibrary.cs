@@ -1,10 +1,44 @@
 namespace VideoRandomizer;
 
+public enum BumperKind
+{
+    Image,
+    Video,
+}
+
+/// <summary>A bumper file plus how it should be presented.</summary>
+public readonly record struct Bumper(string Path, BumperKind Kind);
+
 /// <summary>
 /// Reads the video and bumper folders off disk and puts the results in a random order.
 /// </summary>
 public static class MediaLibrary
 {
+    /// <summary>
+    /// Everything in the bumper folder, tagged as image or video. The two kinds share one pool,
+    /// so a bumper is chosen from all of them with equal probability.
+    /// </summary>
+    public static List<Bumper> ScanBumpers(
+        string folder,
+        IReadOnlyCollection<string> imageExtensions,
+        IReadOnlyCollection<string> videoExtensions,
+        bool searchSubfolders)
+    {
+        var bumpers = new List<Bumper>();
+
+        foreach (string path in Scan(folder, imageExtensions, searchSubfolders))
+        {
+            bumpers.Add(new Bumper(path, BumperKind.Image));
+        }
+
+        foreach (string path in Scan(folder, videoExtensions, searchSubfolders))
+        {
+            bumpers.Add(new Bumper(path, BumperKind.Video));
+        }
+
+        return bumpers;
+    }
+
     /// <summary>
     /// Every file under <paramref name="folder"/> whose extension is in
     /// <paramref name="extensions"/>. Never throws: an unreadable folder yields an empty list,

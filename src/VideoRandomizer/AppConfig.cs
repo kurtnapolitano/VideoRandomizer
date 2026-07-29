@@ -14,13 +14,25 @@ public sealed class AppConfig
     /// <summary>File extensions treated as playable video, e.g. ".mp4".</summary>
     public List<string> VideoExtensions { get; set; } = [];
 
-    /// <summary>Folder that holds the bumper images. Leave blank to disable bumpers.</summary>
+    /// <summary>Folder that holds the bumpers. Leave blank to disable bumpers.</summary>
     public string BumperFolder { get; set; } = "";
 
     /// <summary>File extensions treated as bumper images, e.g. ".jpg".</summary>
-    public List<string> BumperExtensions { get; set; } = [];
+    public List<string> BumperImageExtensions { get; set; } = [];
 
-    /// <summary>How long a bumper image stays on screen, in milliseconds.</summary>
+    /// <summary>File extensions treated as bumper videos, e.g. ".mp4".</summary>
+    public List<string> BumperVideoExtensions { get; set; } = [];
+
+    /// <summary>
+    /// Older name for <see cref="BumperImageExtensions"/>, still read so existing config files
+    /// keep working. Null when the file does not mention it.
+    /// </summary>
+    public List<string>? BumperExtensions { get; set; }
+
+    /// <summary>
+    /// How long a bumper *image* stays on screen, in milliseconds. Bumper videos ignore this and
+    /// play to their natural end. Set to 0 to use video bumpers only.
+    /// </summary>
     public int BumperDurationMs { get; set; } = 5000;
 
     /// <summary>When true, subfolders of the video and bumper folders are scanned too.</summary>
@@ -30,7 +42,9 @@ public sealed class AppConfig
     public bool MuteAudio { get; set; }
 
     [JsonIgnore]
-    public bool BumpersEnabled => !string.IsNullOrWhiteSpace(BumperFolder) && BumperExtensions.Count > 0;
+    public bool BumpersEnabled =>
+        !string.IsNullOrWhiteSpace(BumperFolder)
+        && (BumperImageExtensions.Count > 0 || BumperVideoExtensions.Count > 0);
 }
 
 public sealed class ConfigException(string message) : Exception(message);
@@ -88,7 +102,16 @@ public static class ConfigLoader
         config.VideoFolder = config.VideoFolder.Trim();
         config.BumperFolder = config.BumperFolder.Trim();
         config.VideoExtensions = NormalizeExtensions(config.VideoExtensions);
-        config.BumperExtensions = NormalizeExtensions(config.BumperExtensions);
+        config.BumperImageExtensions = NormalizeExtensions(config.BumperImageExtensions);
+        config.BumperVideoExtensions = NormalizeExtensions(config.BumperVideoExtensions);
+
+        // A config written before bumper videos existed spells the image list "bumperExtensions".
+        if (config.BumperImageExtensions.Count == 0 && config.BumperExtensions is { Count: > 0 })
+        {
+            config.BumperImageExtensions = NormalizeExtensions(config.BumperExtensions);
+        }
+
+        config.BumperExtensions = null;
     }
 
     private static List<string> NormalizeExtensions(IEnumerable<string>? extensions)
@@ -134,6 +157,18 @@ public static class ConfigLoader
         if (config.BumperDurationMs < 0)
         {
             errors.Add("\"bumperDurationMs\" cannot be negative.");
+        }
+
+        // Listing an extension as both would make the same file show up twice in the pool, once
+        // as a still and once as a clip.
+        var overlap = config.BumperImageExtensions
+            .Intersect(config.BumperVideoExtensions, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (overlap.Count > 0)
+        {
+            errors.Add($"{string.Join(", ", overlap)} appears in both \"bumperImageExtensions\" " +
+                       "and \"bumperVideoExtensions\"; each extension belongs to one or the other.");
         }
 
         if (errors.Count > 0)

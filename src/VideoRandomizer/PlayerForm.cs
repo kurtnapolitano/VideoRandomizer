@@ -124,9 +124,16 @@ public sealed class PlayerForm : Form, IMessageFilter
                 var videos = MediaLibrary.Scan(
                     _config.VideoFolder, _config.VideoExtensions, _config.SearchSubfolders);
 
+                // A zero duration means "no stills"; video bumpers are unaffected because they
+                // carry their own length.
+                var imageExtensions = _config.BumperDurationMs > 0
+                    ? _config.BumperImageExtensions
+                    : [];
+
                 var bumpers = _config.BumpersEnabled
-                    ? MediaLibrary.Scan(
-                        _config.BumperFolder, _config.BumperExtensions, _config.SearchSubfolders)
+                    ? MediaLibrary.ScanBumpers(
+                        _config.BumperFolder, imageExtensions, _config.BumperVideoExtensions,
+                        _config.SearchSubfolders)
                     : [];
 
                 if (videos.Count == 0)
@@ -168,21 +175,30 @@ public sealed class PlayerForm : Form, IMessageFilter
         }
     }
 
-    /// <summary>Shows one randomly chosen bumper for the configured duration.</summary>
-    private async Task ShowBumperAsync(IReadOnlyList<string> bumpers, CancellationToken ct)
+    /// <summary>
+    /// Shows one randomly chosen bumper: a still for the configured duration, or a clip played
+    /// through to its end.
+    /// </summary>
+    private async Task ShowBumperAsync(IReadOnlyList<Bumper> bumpers, CancellationToken ct)
     {
-        if (bumpers.Count == 0 || _config.BumperDurationMs <= 0)
+        if (bumpers.Count == 0)
         {
             return;
         }
 
-        string path = bumpers[_rng.Next(bumpers.Count)];
+        var bumper = bumpers[_rng.Next(bumpers.Count)];
+
+        if (bumper.Kind == BumperKind.Video)
+        {
+            await PlayVideoAsync(bumper.Path, ct);
+            return;
+        }
 
         Image image;
         Stream stream;
         try
         {
-            (image, stream) = await Task.Run(() => LoadImage(path), ct);
+            (image, stream) = await Task.Run(() => LoadImage(bumper.Path), ct);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         {
