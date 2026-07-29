@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/VideoRandomizer/VideoRandomizer.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/VideoRandomizer.Tests/VideoRandomizer.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,10 @@
+bin/
+obj/
+dist/
+
+.vs/
+*.user
+*.suo
+
+# Local per-machine playlist settings; config.json in src/ is the shipped template.
+config.local.json
