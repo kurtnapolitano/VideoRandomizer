@@ -1,7 +1,8 @@
 # VideoRandomizer — User Guide
 
 VideoRandomizer plays a folder full of videos on a full screen display, in a random order, with a
-still image ("bumper") shown between each video. It keeps going until you stop it.
+"bumper" shown between each video. A bumper can be a still image or a short video clip. It keeps
+going until you stop it.
 
 This guide is for setting up and running a display. No programming needed.
 
@@ -24,21 +25,26 @@ You do **not** need VLC or a codec pack installed. Everything needed to play vid
 Create two folders — they can live anywhere, including on a network share:
 
 - **A video folder** — put the videos you want to play here.
-- **A bumper folder** — put the still images you want shown between videos here.
+- **A bumper folder** — put the bumpers you want shown between videos here. These can be still
+  images, short video clips, or a mix of both.
 
 Example:
 
 ```
 C:\Signage\Videos     ad-spring.mp4, promo.mkv, tour.avi
-C:\Signage\Bumpers    logo.png, hours.jpg, wifi-info.png
+C:\Signage\Bumpers    logo.png, hours.jpg, wifi-info.png, station-ident.mp4
 ```
 
 Tips:
 
-- Bumper images look best at the same shape as your screen (16:9, e.g. 1920×1080). Images of a
-  different shape are scaled to fit and get black bars — nothing is cropped or stretched.
-- You can add or remove videos while the app is running. New videos are picked up automatically
-  the next time the playlist restarts.
+- Bumpers look best at the same shape as your screen (16:9, e.g. 1920×1080). Anything a different
+  shape is scaled to fit and gets black bars — nothing is cropped or stretched.
+- **Still images** are held for the time you set in `bumperDurationMs`. **Video clips** ignore
+  that setting and simply play to the end, so make them as long as you want them to run.
+- Images and clips are drawn from the same pool. If the folder holds 9 images and 1 clip, the clip
+  comes up about one time in ten.
+- You can add or remove videos and bumpers while the app is running. New files are picked up
+  automatically the next time the playlist restarts.
 
 ---
 
@@ -54,13 +60,17 @@ Open `config.json` (next to `VideoRandomizer.exe`) in Notepad. It looks like thi
   // Which files in that folder count as videos.
   "videoExtensions": [ ".mp4", ".mkv", ".avi", ".mov", ".wmv" ],
 
-  // Folder containing the bumper images shown between videos.
+  // Folder containing the bumpers shown between videos.
   "bumperFolder": "C:/Signage/Bumpers",
 
-  // Which files in that folder count as bumper images.
-  "bumperExtensions": [ ".jpg", ".jpeg", ".png", ".bmp" ],
+  // Which files in that folder are shown as still images.
+  "bumperImageExtensions": [ ".jpg", ".jpeg", ".png", ".bmp" ],
 
-  // How long each bumper image stays on screen, in milliseconds. 5000 = 5 seconds.
+  // Which files in that folder are played as video clips.
+  "bumperVideoExtensions": [ ".mp4", ".mkv", ".avi", ".mov", ".wmv" ],
+
+  // How long each bumper IMAGE stays on screen, in milliseconds. 5000 = 5 seconds.
+  // Video clips ignore this and play to their end.
   "bumperDurationMs": 5000,
 
   // Also look inside subfolders.
@@ -79,9 +89,10 @@ Change the values, save the file, and restart the app.
 |---|---|
 | `videoFolder` | Where your videos are. |
 | `videoExtensions` | The kinds of video files to play. Anything else in the folder is ignored. |
-| `bumperFolder` | Where your bumper images are. Set to `""` to turn bumpers off completely. |
-| `bumperExtensions` | The kinds of image files to show. |
-| `bumperDurationMs` | Bumper time on screen, in **milliseconds**. 3000 = 3 seconds, 10000 = 10 seconds. |
+| `bumperFolder` | Where your bumpers are. Set to `""` to turn bumpers off completely. |
+| `bumperImageExtensions` | The kinds of image files to show as stills. Set to `[]` for video bumpers only. |
+| `bumperVideoExtensions` | The kinds of video files to play as clips. Set to `[]` for still images only. |
+| `bumperDurationMs` | How long a bumper **image** stays on screen, in **milliseconds**. 3000 = 3 seconds. Video clips ignore this. Set to `0` to skip stills entirely and use only clips. |
 | `searchSubfolders` | `true` also looks inside subfolders; `false` only the folder itself. |
 | `muteAudio` | `true` plays everything silently — handy for a shop window. |
 
@@ -108,9 +119,9 @@ Double-click `VideoRandomizer.exe`. The screen goes full screen immediately and 
 
 What you will see:
 
-1. A bumper image for the configured time.
+1. A bumper — a still image for the configured time, or a clip played to its end.
 2. A video, played to the end.
-3. Another bumper image.
+3. Another bumper.
 4. Another video… and so on.
 
 When every video has played once, the app rechecks the folder for new files, reshuffles, and
@@ -166,8 +177,15 @@ Give it a moment — a large video on a network share can take a few seconds to 
 black, check that the `libvlc` folder is still next to `VideoRandomizer.exe`.
 
 **Bumpers never appear**
-Check that `bumperFolder` is not blank, that the folder has images, that their extensions are in
-`bumperExtensions`, and that `bumperDurationMs` is greater than 0.
+Check that `bumperFolder` is not blank, that the folder has files, and that their extensions are
+listed in `bumperImageExtensions` or `bumperVideoExtensions`.
+
+**Bumper images are skipped but clips still play**
+`bumperDurationMs` is 0. Set it to the number of milliseconds you want stills held for.
+
+**A dialog says an extension is in both bumper lists**
+The same extension cannot be both a still and a clip. Remove it from one of the two lists — for
+example `.gif` belongs in `bumperImageExtensions`, not both.
 
 **No sound**
 Check `muteAudio` is `false`, and check the Windows volume mixer for the display PC.

@@ -21,7 +21,8 @@ public class ConfigLoaderTests
               "videoFolder": {{Json(videos)}},
               "videoExtensions": [ ".mp4", ".mkv" ],
               "bumperFolder": {{Json(bumpers)}},
-              "bumperExtensions": [ ".png" ],
+              "bumperImageExtensions": [ ".png" ],
+              "bumperVideoExtensions": [ ".mp4" ],
               "bumperDurationMs": 3500,
               "searchSubfolders": true,
             }
@@ -31,6 +32,8 @@ public class ConfigLoaderTests
 
         Assert.Equal(videos, config.VideoFolder);
         Assert.Equal([".mp4", ".mkv"], config.VideoExtensions);
+        Assert.Equal([".png"], config.BumperImageExtensions);
+        Assert.Equal([".mp4"], config.BumperVideoExtensions);
         Assert.Equal(3500, config.BumperDurationMs);
         Assert.True(config.SearchSubfolders);
         Assert.True(config.BumpersEnabled);
@@ -49,7 +52,8 @@ public class ConfigLoaderTests
               "videoFolder": {{Json(dir.Path)}},
               "videoExtensions": [ {{Json(written)}} ],
               "bumperFolder": "",
-              "bumperExtensions": [],
+              "bumperImageExtensions": [],
+              "bumperVideoExtensions": [],
               "bumperDurationMs": 1000
             }
             """);
@@ -57,6 +61,83 @@ public class ConfigLoaderTests
         var config = ConfigLoader.Load(path);
 
         Assert.Equal([expected], config.VideoExtensions);
+    }
+
+    [Fact]
+    public void Load_VideoOnlyBumpersAreEnabled()
+    {
+        using var dir = new TempDir();
+        string path = ConfigFor(dir, $$"""
+            {
+              "videoFolder": {{Json(dir.Path)}},
+              "videoExtensions": [ ".mp4" ],
+              "bumperFolder": {{Json(dir.Path)}},
+              "bumperImageExtensions": [],
+              "bumperVideoExtensions": [ ".mp4" ],
+              "bumperDurationMs": 0
+            }
+            """);
+
+        Assert.True(ConfigLoader.Load(path).BumpersEnabled);
+    }
+
+    [Fact]
+    public void Load_AcceptsLegacyBumperExtensionsAsImages()
+    {
+        // Config files written before bumper videos existed must keep working.
+        using var dir = new TempDir();
+        string path = ConfigFor(dir, $$"""
+            {
+              "videoFolder": {{Json(dir.Path)}},
+              "videoExtensions": [ ".mp4" ],
+              "bumperFolder": {{Json(dir.Path)}},
+              "bumperExtensions": [ ".png", ".jpg" ],
+              "bumperDurationMs": 1000
+            }
+            """);
+
+        var config = ConfigLoader.Load(path);
+
+        Assert.Equal([".png", ".jpg"], config.BumperImageExtensions);
+        Assert.Empty(config.BumperVideoExtensions);
+        Assert.True(config.BumpersEnabled);
+    }
+
+    [Fact]
+    public void Load_NewImageExtensionsWinOverLegacyName()
+    {
+        using var dir = new TempDir();
+        string path = ConfigFor(dir, $$"""
+            {
+              "videoFolder": {{Json(dir.Path)}},
+              "videoExtensions": [ ".mp4" ],
+              "bumperFolder": {{Json(dir.Path)}},
+              "bumperImageExtensions": [ ".png" ],
+              "bumperExtensions": [ ".bmp" ],
+              "bumperDurationMs": 1000
+            }
+            """);
+
+        Assert.Equal([".png"], ConfigLoader.Load(path).BumperImageExtensions);
+    }
+
+    [Fact]
+    public void Load_ExtensionInBothBumperListsIsReported()
+    {
+        using var dir = new TempDir();
+        string path = ConfigFor(dir, $$"""
+            {
+              "videoFolder": {{Json(dir.Path)}},
+              "videoExtensions": [ ".mp4" ],
+              "bumperFolder": {{Json(dir.Path)}},
+              "bumperImageExtensions": [ ".gif" ],
+              "bumperVideoExtensions": [ ".GIF" ],
+              "bumperDurationMs": 1000
+            }
+            """);
+
+        var ex = Assert.Throws<ConfigException>(() => ConfigLoader.Load(path));
+        Assert.Contains(".gif", ex.Message);
     }
 
     [Fact]
@@ -68,7 +149,8 @@ public class ConfigLoaderTests
               "videoFolder": {{Json(dir.Path)}},
               "videoExtensions": [ ".mp4" ],
               "bumperFolder": "",
-              "bumperExtensions": [ ".png" ],
+              "bumperImageExtensions": [ ".png" ],
+              "bumperVideoExtensions": [ ".mp4" ],
               "bumperDurationMs": 1000
             }
             """);
@@ -85,7 +167,7 @@ public class ConfigLoaderTests
               "videoFolder": "Z:/nope",
               "videoExtensions": [ ".mp4" ],
               "bumperFolder": "",
-              "bumperExtensions": [],
+              "bumperImageExtensions": [],
               "bumperDurationMs": 1000
             }
             """);
@@ -103,7 +185,7 @@ public class ConfigLoaderTests
               "videoFolder": {{Json(dir.Path)}},
               "videoExtensions": [],
               "bumperFolder": "",
-              "bumperExtensions": [],
+              "bumperImageExtensions": [],
               "bumperDurationMs": 1000
             }
             """);

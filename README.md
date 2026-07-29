@@ -1,8 +1,8 @@
 # VideoRandomizer
 
 A Windows kiosk player for ads and other videos. It launches straight into full screen, shuffles
-every video in a folder, and shows a randomly chosen bumper image between each one. It runs
-forever until someone presses **ESC**.
+every video in a folder, and shows a randomly chosen bumper — a still image or a short clip —
+between each one. It runs forever until someone presses **ESC**.
 
 Playback is handled by the VLC engine, which ships inside the app — the machine does **not** need
 VLC installed or any codec pack, and it plays `.avi`, `.mkv`, `.mp4`, `.mov`, `.wmv` and friends
@@ -14,8 +14,10 @@ out of the box.
 ## How it behaves
 
 1. On start it scans the video folder and shuffles the whole list.
-2. It shows a random bumper image, then plays a video, then another random bumper, then the next
+2. It shows a random bumper, then plays a video, then another random bumper, then the next
    video — a bumper before every video, including the first.
+   Bumpers can be still images or video clips, mixed freely in one folder. A still is held for
+   `bumperDurationMs`; a clip plays through to its natural end.
 3. When the last video finishes, it rescans the folder from disk, so videos added while it was
    running get picked up, and shuffles again.
 4. If the reshuffle would start with the video that just played, it reshuffles until it does not.
@@ -92,17 +94,25 @@ Copy the whole `dist` folder to the target machine and run `VideoRandomizer.exe`
 |---|---|
 | `videoFolder` | Folder holding the videos to play. |
 | `videoExtensions` | Which files count as videos. `"mp4"`, `".MP4"` and `"*.mp4"` all work. |
-| `bumperFolder` | Folder holding the bumper images. Set to `""` to turn bumpers off. |
-| `bumperExtensions` | Which files count as bumper images. |
-| `bumperDurationMs` | How long each bumper stays on screen, in milliseconds. |
+| `bumperFolder` | Folder holding the bumpers. Set to `""` to turn bumpers off. |
+| `bumperImageExtensions` | Which files in that folder are shown as still images. |
+| `bumperVideoExtensions` | Which files in that folder are played as clips. `[]` for images only. |
+| `bumperDurationMs` | How long each bumper **image** stays on screen, in milliseconds. Clips ignore it and play to their end; `0` means video bumpers only. |
 | `searchSubfolders` | Also scan subfolders of the two folders above. |
 | `muteAudio` | Play videos with the sound off. |
 
 Paths need forward slashes (`C:/Videos`) or doubled backslashes (`C:\\Videos`), because a single
 backslash is an escape character in JSON. UNC paths like `//server/share/Videos` work.
 
+Images and clips share a single pool, so each bumper slot picks uniformly across every bumper
+file in the folder regardless of type.
+
 If anything in the file is wrong — bad JSON, a folder that does not exist, an empty extension
-list — the app explains the problem in a dialog and exits instead of starting up blank.
+list, the same extension in both bumper lists — the app explains the problem in a dialog and
+exits instead of starting up blank.
+
+Config files written before bumper videos existed used `bumperExtensions` for the image list;
+that name is still read as `bumperImageExtensions`, so older configs keep working.
 
 ## Project layout
 
