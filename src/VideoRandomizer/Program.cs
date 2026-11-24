@@ -1,5 +1,3 @@
-using LibVLCSharp.Shared;
-
 namespace VideoRandomizer;
 
 internal static class Program
@@ -7,6 +5,8 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
+        StartupLog.Begin();
+
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
@@ -24,16 +24,7 @@ internal static class Program
             return;
         }
 
-        try
-        {
-            Core.Initialize();
-        }
-        catch (Exception ex)
-        {
-            ShowError($"Could not start the VLC playback engine.{Environment.NewLine}" +
-                      $"{Environment.NewLine}{ex.Message}");
-            return;
-        }
+        StartupLog.Write("config loaded");
 
         Application.Run(new PlayerForm(config));
 

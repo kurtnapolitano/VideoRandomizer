@@ -84,7 +84,12 @@ To produce a folder that runs on a PC with no .NET installed:
 dotnet publish src\VideoRandomizer\VideoRandomizer.csproj -c Release -r win-x64 --self-contained true -o dist
 ```
 
-Copy the whole `dist` folder to the target machine and run `VideoRandomizer.exe` from it.
+Copy the whole `dist` folder to the target machine (by thumb drive is fine; no internet is needed)
+and run `VideoRandomizer.exe` from a local disk, in a folder the user can write to.
+
+Run it once straight after deploying. That first launch builds VLC's plugin cache
+(`libvlc\win-x64\plugins\plugins.dat`), which makes later launches much quicker to load the
+engine. The cache is rebuilt automatically whenever the plugin files change.
 
 ## Configuration
 
@@ -107,9 +112,11 @@ backslash is an escape character in JSON. UNC paths like `//server/share/Videos`
 Images and clips share a single pool, so each bumper slot picks uniformly across every bumper
 file in the folder regardless of type.
 
-If anything in the file is wrong — bad JSON, a folder that does not exist, an empty extension
-list, the same extension in both bumper lists — the app explains the problem in a dialog and
-exits instead of starting up blank.
+If anything in the file is wrong — bad JSON, a blank video folder, an empty extension list, the
+same extension in both bumper lists — the app explains the problem in a dialog and exits instead
+of starting up blank. A folder that cannot be reached is not treated as a config error: the app
+shows which one it is waiting for and starts once it appears, since network and cloud drives are
+often still connecting just after a reboot.
 
 Config files written before bumper videos existed used `bumperExtensions` for the image list;
 that name is still read as `bumperImageExtensions`, so older configs keep working.
@@ -119,8 +126,10 @@ that name is still read as `bumperImageExtensions`, so older configs keep workin
 ```
 VideoRandomizer.slnx
 src/VideoRandomizer/
-  Program.cs        entry point: load config, start VLC, run the form
-  PlayerForm.cs     full screen window, playback loop, ESC handling
+  Program.cs        entry point: load config, run the form
+  PlayerForm.cs     full screen window, VLC startup, playback loop, ESC handling
+  PluginCache.cs    decides when to rebuild VLC's plugin cache
+  StartupLog.cs     timing of each startup step, written to startup.log
   MediaLibrary.cs   folder scanning and the no-repeat shuffle
   AppConfig.cs      config model, loading, normalization, validation
   config.json       the configuration file, copied next to the exe
@@ -131,6 +140,9 @@ docs/USER-GUIDE.md
 ## Notes on behaviour
 
 - The app runs on the **primary monitor**.
+- The window appears before the VLC engine and media folders are loaded. Each startup step is
+  timed in `startup.log` beside the exe (or in `%LOCALAPPDATA%\VideoRandomizer` if that folder is
+  read-only).
 - The mouse cursor is hidden while it runs.
 - It keeps the display awake, so Windows power settings will not blank the screen mid-playlist.
 - If a video is corrupt or unreadable, it is skipped and the loop continues to the next one.

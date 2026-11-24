@@ -159,17 +159,46 @@ public class ConfigLoaderTests
     }
 
     [Fact]
-    public void Load_MissingVideoFolderIsReported()
+    public void Load_UnreachableFoldersDoNotFailTheLoad()
+    {
+        // A network drive may still be connecting after a reboot, so the player waits for it.
+        using var dir = new TempDir();
+        string videos = Path.Combine(dir.Path, "not-yet-videos");
+        string bumpers = Path.Combine(dir.Path, "not-yet-bumpers");
+        string path = ConfigFor(dir, $$"""
+            {
+              "videoFolder": {{Json(videos)}},
+              "videoExtensions": [ ".mp4" ],
+              "bumperFolder": {{Json(bumpers)}},
+              "bumperImageExtensions": [ ".png" ]
+            }
+            """);
+
+        var config = ConfigLoader.Load(path);
+
+        Assert.Equal([videos, bumpers], ConfigLoader.MissingFolders(config));
+
+        Directory.CreateDirectory(videos);
+        Directory.CreateDirectory(bumpers);
+
+        Assert.Empty(ConfigLoader.MissingFolders(config));
+    }
+
+    [Fact]
+    public void MissingFolders_IgnoresABlankBumperFolder()
+    {
+        using var dir = new TempDir();
+        var config = new AppConfig { VideoFolder = dir.Path, BumperFolder = "" };
+
+        Assert.Empty(ConfigLoader.MissingFolders(config));
+    }
+
+    [Fact]
+    public void Load_BlankVideoFolderIsReported()
     {
         using var dir = new TempDir();
         string path = ConfigFor(dir, """
-            {
-              "videoFolder": "Z:/nope",
-              "videoExtensions": [ ".mp4" ],
-              "bumperFolder": "",
-              "bumperImageExtensions": [],
-              "bumperDurationMs": 1000
-            }
+            { "videoFolder": "", "videoExtensions": [ ".mp4" ] }
             """);
 
         var ex = Assert.Throws<ConfigException>(() => ConfigLoader.Load(path));

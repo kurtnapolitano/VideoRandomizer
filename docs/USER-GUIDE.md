@@ -13,7 +13,9 @@ This guide is for setting up and running a display. No programming needed.
 1. Copy the `VideoRandomizer` folder onto the display PC — anywhere is fine, e.g. `C:\VideoRandomizer`.
 2. Keep the folder together. `VideoRandomizer.exe` needs the files next to it, especially the
    `libvlc` folder, which is the video engine.
-3. If the app refuses to start with a message about .NET, install the **.NET 10 Desktop Runtime**
+3. Copy it to the PC's own disk rather than running it from a thumb drive, then run it once. The
+   first run takes longer while it prepares the video engine. Press ESC once videos are playing.
+4. If the app refuses to start with a message about .NET, install the **.NET 10 Desktop Runtime**
    from Microsoft. (If your copy was published as "self-contained", you can skip this.)
 
 You do **not** need VLC or a codec pack installed. Everything needed to play video is included.
@@ -115,7 +117,9 @@ Network shares work too: `"//server/share/Videos"`.
 
 ## 4. Run it
 
-Double-click `VideoRandomizer.exe`. The screen goes full screen immediately and playback starts.
+Double-click `VideoRandomizer.exe`. The screen goes full screen and shows **Starting…**, then
+playback begins. The first start after the PC restarts can take a minute or two; there is no need
+to double-click again.
 
 What you will see:
 
@@ -165,8 +169,15 @@ rechecks every 10 seconds, so fixing the folder gets it going without a restart.
 Usually a single backslash in a path (see the path rule above), or a missing comma or quote.
 The message includes the line number.
 
-**A dialog says a folder does not exist**
-The path is misspelled, or it is a network share this PC cannot currently reach.
+**"Waiting for…" a folder stays on screen**
+The path is misspelled, or it is a drive or network share this PC cannot currently reach. The app
+keeps checking and starts by itself once the folder appears. Press ESC to exit and fix
+`config.json`.
+
+**It takes a long time to start**
+Restart the PC, run the app, and send us the `startup.log` file from the app's folder. It records
+how long each step of starting up took. (If the app's folder is read-only, the file is in
+`%LOCALAPPDATA%\VideoRandomizer`.)
 
 **One video is skipped every time**
 It is probably corrupt or partially copied. Try opening it in a media player; re-export or

@@ -16,6 +16,9 @@ public sealed class PlayerForm : Form, IMessageFilter
     /// <summary>How long to wait before rescanning when the video folder is empty.</summary>
     private static readonly TimeSpan EmptyFolderRetry = TimeSpan.FromSeconds(10);
 
+    /// <summary>How often to look again for a folder that is not reachable at startup.</summary>
+    private static readonly TimeSpan MissingFolderRetry = TimeSpan.FromSeconds(3);
+
     private readonly AppConfig _config;
     private readonly Random _rng = new();
     private readonly CancellationTokenSource _cts = new();
@@ -89,7 +92,40 @@ public sealed class PlayerForm : Form, IMessageFilter
         Cursor.Hide();
         KeepDisplayAwake();
 
-        _libVlc = new LibVLC();
+        ShowStatus("Starting…");
+    }
+
+    protected override void OnShown(EventArgs e)
+    {
+        base.OnShown(e);
+        Activate();
+        Update(); // Paint "Starting…" before any of the slow work begins.
+        StartupLog.Write("window on screen");
+        _ = RunAsync(_cts.Token);
+    }
+
+    /// <summary>
+    /// Loads the VLC engine off the UI thread. The first load after a reboot can take a minute or
+    /// more, and the window has to stay painted and responsive to ESC throughout.
+    /// </summary>
+    private async Task StartEngineAsync(CancellationToken ct)
+    {
+        ShowStatus(
+            $"Starting…{Environment.NewLine}{Environment.NewLine}" +
+            "Loading the video player. This can take a minute or two after the PC restarts.");
+        StartupLog.Write("loading VLC engine");
+
+        try
+        {
+            _libVlc = await Task.Run(CreateLibVlc, ct).WaitAsync(ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw new InvalidOperationException($"Could not start the VLC playback engine. {ex.Message}", ex);
+        }
+
+        StartupLog.Write("VLC engine loaded");
+
         _player = new MediaPlayer(_libVlc)
         {
             // Let the form own the keyboard and mouse so ESC always reaches us.
@@ -99,14 +135,71 @@ public sealed class PlayerForm : Form, IMessageFilter
         };
         _videoView.MediaPlayer = _player;
 
-        ShowStatus("Starting…");
+        // Only the first playback matters for diagnosing a slow start.
+        int logged = 0;
+        _player.Playing += (_, _) =>
+        {
+            if (Interlocked.Exchange(ref logged, 1) == 0)
+            {
+                StartupLog.Write("first clip playing");
+            }
+        };
     }
 
-    protected override void OnShown(EventArgs e)
+    private static LibVLC CreateLibVlc()
     {
-        base.OnShown(e);
-        Activate();
-        _ = RunAsync(_cts.Token);
+        Core.Initialize();
+
+        // Core.Initialize loads the engine from this folder.
+        var cache = new PluginCache(Path.Combine(
+            AppContext.BaseDirectory, "libvlc", "win-x64", "plugins"));
+
+        if (!cache.NeedsRebuild())
+        {
+            return new LibVLC();
+        }
+
+        StartupLog.Write("building VLC plugin cache (first run of this copy)");
+        var libVlc = new LibVLC("--reset-plugins-cache");
+        StartupLog.Write(cache.MarkBuilt()
+            ? "plugin cache built"
+            : "plugin cache could not be written; is the app folder read-only?");
+        return libVlc;
+    }
+
+    /// <summary>Holds on a status screen until every configured folder can be reached.</summary>
+    private async Task WaitForFoldersAsync(CancellationToken ct)
+    {
+        ShowStatus($"Starting…{Environment.NewLine}{Environment.NewLine}Looking for the media folders.");
+        StartupLog.Write("checking folders");
+
+        string lastLogged = "";
+        while (true)
+        {
+            // An unreachable share can block for a long time, so never check on the UI thread.
+            var missing = await Task.Run(() => ConfigLoader.MissingFolders(_config), ct).WaitAsync(ct);
+            if (missing.Count == 0)
+            {
+                break;
+            }
+
+            ShowStatus(
+                $"Waiting for{Environment.NewLine}{string.Join(Environment.NewLine, missing)}" +
+                $"{Environment.NewLine}{Environment.NewLine}" +
+                $"Check that the drive is connected and the path in config.json is correct." +
+                $"{Environment.NewLine}Press ESC to exit.");
+
+            string names = string.Join(", ", missing);
+            if (names != lastLogged)
+            {
+                StartupLog.Write($"waiting for folder(s): {names}");
+                lastLogged = names;
+            }
+
+            await Task.Delay(MissingFolderRetry, ct);
+        }
+
+        StartupLog.Write("folders found");
     }
 
     /// <summary>
@@ -117,12 +210,17 @@ public sealed class PlayerForm : Form, IMessageFilter
     {
         string? lastPlayed = null;
 
+        bool firstScan = true;
+
         try
         {
+            await StartEngineAsync(ct);
+            await WaitForFoldersAsync(ct);
+
             while (!ct.IsCancellationRequested)
             {
-                var videos = MediaLibrary.Scan(
-                    _config.VideoFolder, _config.VideoExtensions, _config.SearchSubfolders);
+                var videos = await Task.Run(() => MediaLibrary.Scan(
+                    _config.VideoFolder, _config.VideoExtensions, _config.SearchSubfolders), ct).WaitAsync(ct);
 
                 // A zero duration means "no stills"; video bumpers are unaffected because they
                 // carry their own length.
@@ -131,10 +229,16 @@ public sealed class PlayerForm : Form, IMessageFilter
                     : [];
 
                 var bumpers = _config.BumpersEnabled
-                    ? MediaLibrary.ScanBumpers(
+                    ? await Task.Run(() => MediaLibrary.ScanBumpers(
                         _config.BumperFolder, imageExtensions, _config.BumperVideoExtensions,
-                        _config.SearchSubfolders)
+                        _config.SearchSubfolders), ct).WaitAsync(ct)
                     : [];
+
+                if (firstScan)
+                {
+                    StartupLog.Write($"scan found {videos.Count} video(s), {bumpers.Count} bumper(s)");
+                    firstScan = false;
+                }
 
                 if (videos.Count == 0)
                 {
@@ -169,6 +273,7 @@ public sealed class PlayerForm : Form, IMessageFilter
         }
         catch (Exception ex)
         {
+            StartupLog.Write($"playback stopped: {ex.Message}");
             ShowStatus($"Playback stopped after an unexpected error:{Environment.NewLine}" +
                        $"{Environment.NewLine}{ex.Message}{Environment.NewLine}" +
                        $"{Environment.NewLine}Press ESC to exit.");

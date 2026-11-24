@@ -95,6 +95,20 @@ public static class ConfigLoader
     }
 
     /// <summary>
+    /// The configured folders that cannot be reached right now. This is not part of
+    /// <see cref="Load"/> because a network or cloud drive is often still connecting just after a
+    /// reboot; the player waits for it instead of refusing to start.
+    /// </summary>
+    public static List<string> MissingFolders(AppConfig config)
+    {
+        // A blank bumper folder is a legitimate way to turn bumpers off.
+        return new[] { config.VideoFolder, config.BumperFolder }
+            .Where(f => f.Length > 0 && !Directory.Exists(f))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    /// <summary>
     /// Accept the extension spellings people actually type: "mp4", ".MP4", "*.mp4".
     /// </summary>
     private static void Normalize(AppConfig config)
@@ -138,20 +152,10 @@ public static class ConfigLoader
         {
             errors.Add("\"videoFolder\" is required.");
         }
-        else if (!Directory.Exists(config.VideoFolder))
-        {
-            errors.Add($"\"videoFolder\" does not exist: {config.VideoFolder}");
-        }
 
         if (config.VideoExtensions.Count == 0)
         {
             errors.Add("\"videoExtensions\" must list at least one extension, e.g. [ \".mp4\", \".mkv\" ].");
-        }
-
-        // A blank bumper folder is a legitimate way to turn bumpers off; a wrong one is not.
-        if (config.BumperFolder.Length > 0 && !Directory.Exists(config.BumperFolder))
-        {
-            errors.Add($"\"bumperFolder\" does not exist: {config.BumperFolder}");
         }
 
         if (config.BumperDurationMs < 0)
